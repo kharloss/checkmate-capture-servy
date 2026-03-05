@@ -169,6 +169,11 @@ C:\monitor\servy\servy-cli.exe uninstall --name=CaptureClient
 └── README.md                   # This file
 ```
 
+## Credits
+
+- [Servy](https://github.com/aelassas/servy) - Windows service wrapper
+- [CheckMate Capture](https://github.com/bluewave-labs/capture) - Capture client software
+
 ## License
 
 MIT License
