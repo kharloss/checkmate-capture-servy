@@ -11,6 +11,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Get-LatestGitHubRelease {
+    param([string]$Owner, [string]$Repo)
+    try {
+        $response = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/releases/latest" -UseBasicParsing
+        return $response.tag_name -replace '^v', ''
+    } catch {
+        return $null
+    }
+}
+
+$fallbackServyVersion = "6.8"
+$fallbackCaptureVersion = "1.3.2"
+
 # Check for Administrator privileges
 function Test-Administrator {
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -83,12 +96,21 @@ if (-not (Test-Path $ServyInstallDir)) {
 
 # Download servy portable
 Write-Host "[3/5] Downloading servy portable..." -ForegroundColor Yellow
-$servyUrl = "https://github.com/aelassas/servy/releases/download/v6.8/servy-6.8-x64-portable.7z"
+
+$servyVersion = Get-LatestGitHubRelease -Owner "aelassas" -Repo "servy"
+if ([string]::IsNullOrEmpty($servyVersion)) {
+    $servyVersion = $fallbackServyVersion
+    Write-Host "  Using fallback servy version: v$servyVersion" -ForegroundColor Yellow
+} else {
+    Write-Host "  Latest servy version: v$servyVersion" -ForegroundColor Gray
+}
+
+$servyUrl = "https://github.com/aelassas/servy/releases/download/v$servyVersion/servy-$servyVersion-x64-portable.7z"
 $servyArchive = "$env:TEMP\servy.7z"
 
 try {
     Invoke-WebRequest -Uri $servyUrl -OutFile $servyArchive -UseBasicParsing
-    Write-Host "  Downloaded servy v6.8 portable" -ForegroundColor Green
+    Write-Host "  Downloaded servy v$servyVersion portable" -ForegroundColor Green
 } catch {
     Write-Host "ERROR: Failed to download servy: $_" -ForegroundColor Red
     exit 1
@@ -109,7 +131,7 @@ try {
     Remove-Item $servyArchive -Force
     
     # Move files from subfolder to main directory
-    $servySubfolder = Join-Path $ServyInstallDir "servy-6.8-x64-portable"
+    $servySubfolder = Join-Path $ServyInstallDir "servy-$servyVersion-x64-portable"
     if (Test-Path $servySubfolder) {
         Get-ChildItem $servySubfolder | Move-Item -Destination $ServyInstallDir -Force
         Remove-Item $servySubfolder -Recurse -Force
@@ -123,12 +145,21 @@ try {
 
 # Download capture
 Write-Host "[5/5] Downloading CheckMate Capture client..." -ForegroundColor Yellow
-$captureUrl = "https://github.com/bluewave-labs/capture/releases/download/v1.3.2/capture_1.3.2_windows_amd64.zip"
+
+$captureVersion = Get-LatestGitHubRelease -Owner "bluewave-labs" -Repo "capture"
+if ([string]::IsNullOrEmpty($captureVersion)) {
+    $captureVersion = $fallbackCaptureVersion
+    Write-Host "  Using fallback capture version: v$captureVersion" -ForegroundColor Yellow
+} else {
+    Write-Host "  Latest capture version: v$captureVersion" -ForegroundColor Gray
+}
+
+$captureUrl = "https://github.com/bluewave-labs/capture/releases/download/v$captureVersion/capture_${captureVersion}_windows_amd64.zip"
 $captureZip = "$CaptureInstallDir\capture.zip"
 
 try {
     Invoke-WebRequest -Uri $captureUrl -OutFile $captureZip -UseBasicParsing
-    Write-Host "  Downloaded capture v1.3.2" -ForegroundColor Green
+    Write-Host "  Downloaded capture v$captureVersion" -ForegroundColor Green
 } catch {
     Write-Host "ERROR: Failed to download capture: $_" -ForegroundColor Red
     exit 1
@@ -140,7 +171,7 @@ try {
     Remove-Item $captureZip -Force
     
     # Rename capture.exe to avoid conflict with folder name
-    $extractedCaptureDir = Join-Path $CaptureInstallDir "capture_1.3.2_windows_amd64"
+    $extractedCaptureDir = Join-Path $CaptureInstallDir "capture_${captureVersion}_windows_amd64"
     if (Test-Path $extractedCaptureDir) {
         $captureExeSource = Join-Path $extractedCaptureDir "capture.exe"
         $captureExeDest = Join-Path $CaptureInstallDir "capture.exe"
