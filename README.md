@@ -116,6 +116,7 @@ C:\monitor\servy\servy-cli.exe uninstall --name=CaptureClient
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `API_SECRET` | Yes | Secret key for CheckMate Capture authentication |
+| `GIN_MODE` | No | Gin web framework mode (default: "release") |
 
 ```powershell
 # Set API_SECRET manually

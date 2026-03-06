@@ -42,6 +42,21 @@ if ([string]::IsNullOrEmpty($apiSecret)) {
     Write-Host "API_SECRET is already configured." -ForegroundColor Green
 }
 
+# Check for GIN_MODE environment variable
+$ginMode = [Environment]::GetEnvironmentVariable("GIN_MODE", "Machine")
+if ([string]::IsNullOrEmpty($ginMode)) {
+    [Environment]::SetEnvironmentVariable("GIN_MODE", "release", "Machine")
+    Write-Host "GIN_MODE set to 'release' as system environment variable." -ForegroundColor Green
+} else {
+    Write-Host "GIN_MODE is already configured." -ForegroundColor Green
+}
+
+# Refresh environment variables from registry
+$machineEnv = [Environment]::GetEnvironmentVariables("Machine")
+foreach ($key in $machineEnv.Keys) {
+    [Environment]::SetEnvironmentVariable($key, $machineEnv[$key], "Process")
+}
+
 Write-Host ""
 
 Write-Host "=== CheckMate Capture Client Setup ===" -ForegroundColor Cyan
