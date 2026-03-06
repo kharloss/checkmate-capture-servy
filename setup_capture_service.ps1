@@ -1,5 +1,19 @@
-# CheckMate Capture Client Setup Script
-# This script downloads and sets up capture.exe as a Windows service using servy
+#################################################################################################################
+#
+# CheckMate Capture Client Setup Script v1.2.0
+# https://github.com/kharloss/checkmate-capture-servy
+#
+#   Adi Iacob (kharloss)
+#   trioserv.ro
+#   This script downloads and sets up capture.exe as a Windows service using servy
+#
+# Requires:
+# Windows | Server 2016+ or Windows 10/11 |
+# Privileges | Administrator |
+# 7-Zip | Installed |
+# Internet | Required for downloads |
+#
+##################################################################################################################
 
 param(
     [string]$CaptureInstallDir = "C:\monitor\capture",
@@ -11,12 +25,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Get-LatestGitHubRelease {
+function Get-LatestGitHubRelease
+{
     param([string]$Owner, [string]$Repo)
-    try {
+    try
+    {
         $response = Invoke-RestMethod -Uri "https://api.github.com/repos/$Owner/$Repo/releases/latest" -UseBasicParsing
         return $response.tag_name -replace '^v', ''
-    } catch {
+    } catch
+    {
         return $null
     }
 }
@@ -24,49 +41,68 @@ function Get-LatestGitHubRelease {
 $fallbackServyVersion = "6.8"
 $fallbackCaptureVersion = "1.3.2"
 
+# Optional: Set API_SECRET here to skip prompting
+$apiSecret = "your_apy_key_here"
+
 # Check for Administrator privileges
-function Test-Administrator {
+function Test-Administrator
+{
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-if (-not (Test-Administrator)) {
+if (-not (Test-Administrator))
+{
     Write-Host "ERROR: This script must be run as Administrator" -ForegroundColor Red
     Write-Host "Please right-click on PowerShell and select 'Run as Administrator'" -ForegroundColor Yellow
     exit 1
 }
 
 # Check for API_SECRET environment variable
-$apiSecret = [Environment]::GetEnvironmentVariable("API_SECRET", "Machine")
-if ([string]::IsNullOrEmpty($apiSecret)) {
-    Write-Host ""
-    Write-Host "WARNING: API_SECRET environment variable is not set!" -ForegroundColor Yellow
-    Write-Host "This is required for capture.exe to run." -ForegroundColor Yellow
-    Write-Host ""
-    $apiSecretInput = Read-Host "Enter API_SECRET value (or press Enter to skip and configure manually)"
-    if ([string]::IsNullOrWhiteSpace($apiSecretInput)) {
-        Write-Host "Skipped. You will need to set API_SECRET manually before starting the service." -ForegroundColor Yellow
-    } else {
-        [Environment]::SetEnvironmentVariable("API_SECRET", $apiSecretInput, "Machine")
-        Write-Host "API_SECRET has been set as a system environment variable." -ForegroundColor Green
+if (-not [string]::IsNullOrEmpty($apiSecret))
+{
+    [Environment]::SetEnvironmentVariable("API_SECRET", $apiSecret, "Machine")
+    Write-Host "API_SECRET set from script variable." -ForegroundColor Green
+} else
+{
+    $apiSecret = [Environment]::GetEnvironmentVariable("API_SECRET", "Machine")
+    if ([string]::IsNullOrEmpty($apiSecret))
+    {
+        Write-Host ""
+        Write-Host "WARNING: API_SECRET environment variable is not set!" -ForegroundColor Yellow
+        Write-Host "This is required for capture.exe to run." -ForegroundColor Yellow
+        Write-Host ""
+        $apiSecretInput = Read-Host "Enter API_SECRET value (or press Enter to skip and configure manually)"
+        if ([string]::IsNullOrWhiteSpace($apiSecretInput))
+        {
+            Write-Host "Skipped. You will need to set API_SECRET manually before starting the service." -ForegroundColor Yellow
+        } else
+        {
+            [Environment]::SetEnvironmentVariable("API_SECRET", $apiSecretInput, "Machine")
+            Write-Host "API_SECRET has been set as a system environment variable." -ForegroundColor Green
+        }
+    } else
+    {
+        Write-Host "API_SECRET is already configured." -ForegroundColor Green
     }
-} else {
-    Write-Host "API_SECRET is already configured." -ForegroundColor Green
 }
 
 # Check for GIN_MODE environment variable
 $ginMode = [Environment]::GetEnvironmentVariable("GIN_MODE", "Machine")
-if ([string]::IsNullOrEmpty($ginMode)) {
+if ([string]::IsNullOrEmpty($ginMode))
+{
     [Environment]::SetEnvironmentVariable("GIN_MODE", "release", "Machine")
     Write-Host "GIN_MODE set to 'release' as system environment variable." -ForegroundColor Green
-} else {
+} else
+{
     Write-Host "GIN_MODE is already configured." -ForegroundColor Green
 }
 
 # Refresh environment variables from registry
 $machineEnv = [Environment]::GetEnvironmentVariables("Machine")
-foreach ($key in $machineEnv.Keys) {
+foreach ($key in $machineEnv.Keys)
+{
     [Environment]::SetEnvironmentVariable($key, $machineEnv[$key], "Process")
 }
 
@@ -79,18 +115,22 @@ Write-Host "Service Name:      $ServiceName" -ForegroundColor Gray
 Write-Host ""
 
 # Create capture installation directory
-if (-not (Test-Path $CaptureInstallDir)) {
+if (-not (Test-Path $CaptureInstallDir))
+{
     Write-Host "[1/5] Creating capture directory..." -ForegroundColor Yellow
     New-Item -ItemType Directory -Path $CaptureInstallDir -Force | Out-Null
-} else {
+} else
+{
     Write-Host "[1/5] Capture directory exists" -ForegroundColor Gray
 }
 
 # Create servy installation directory
-if (-not (Test-Path $ServyInstallDir)) {
+if (-not (Test-Path $ServyInstallDir))
+{
     Write-Host "[2/5] Creating servy directory..." -ForegroundColor Yellow
     New-Item -ItemType Directory -Path $ServyInstallDir -Force | Out-Null
-} else {
+} else
+{
     Write-Host "[2/5] Servy directory exists" -ForegroundColor Gray
 }
 
@@ -98,47 +138,56 @@ if (-not (Test-Path $ServyInstallDir)) {
 Write-Host "[3/5] Downloading servy portable..." -ForegroundColor Yellow
 
 $servyVersion = Get-LatestGitHubRelease -Owner "aelassas" -Repo "servy"
-if ([string]::IsNullOrEmpty($servyVersion)) {
+if ([string]::IsNullOrEmpty($servyVersion))
+{
     $servyVersion = $fallbackServyVersion
     Write-Host "  Using fallback servy version: v$servyVersion" -ForegroundColor Yellow
-} else {
+} else
+{
     Write-Host "  Latest servy version: v$servyVersion" -ForegroundColor Gray
 }
 
 $servyUrl = "https://github.com/aelassas/servy/releases/download/v$servyVersion/servy-$servyVersion-x64-portable.7z"
 $servyArchive = "$env:TEMP\servy.7z"
 
-try {
+try
+{
     Invoke-WebRequest -Uri $servyUrl -OutFile $servyArchive -UseBasicParsing
     Write-Host "  Downloaded servy v$servyVersion portable" -ForegroundColor Green
-} catch {
+} catch
+{
     Write-Host "ERROR: Failed to download servy: $_" -ForegroundColor Red
     exit 1
 }
 
 # Extract servy using 7zip to C:\monitor\servy
 Write-Host "[4/5] Extracting servy..." -ForegroundColor Yellow
-try {
+try
+{
     $sevenZip = "D:\Applications\Scoop\apps\7zip\current\7z.exe"
-    if (-not (Test-Path $sevenZip)) {
+    if (-not (Test-Path $sevenZip))
+    {
         $sevenZip = "C:\Program Files\7-Zip\7z.exe"
     }
-    if (-not (Test-Path $sevenZip)) {
+    if (-not (Test-Path $sevenZip))
+    {
         Write-Host "ERROR: 7-Zip not found" -ForegroundColor Red
         exit 1
     }
     & $sevenZip x "$servyArchive" -o"$ServyInstallDir" -y | Out-Null
     Remove-Item $servyArchive -Force
-    
+
     # Move files from subfolder to main directory
     $servySubfolder = Join-Path $ServyInstallDir "servy-$servyVersion-x64-portable"
-    if (Test-Path $servySubfolder) {
+    if (Test-Path $servySubfolder)
+    {
         Get-ChildItem $servySubfolder | Move-Item -Destination $ServyInstallDir -Force
         Remove-Item $servySubfolder -Recurse -Force
     }
-    
+
     Write-Host "  Extracted servy to $ServyInstallDir" -ForegroundColor Green
-} catch {
+} catch
+{
     Write-Host "ERROR: Failed to extract servy: $_" -ForegroundColor Red
     exit 1
 }
@@ -147,35 +196,42 @@ try {
 Write-Host "[5/5] Downloading CheckMate Capture client..." -ForegroundColor Yellow
 
 $captureVersion = Get-LatestGitHubRelease -Owner "bluewave-labs" -Repo "capture"
-if ([string]::IsNullOrEmpty($captureVersion)) {
+if ([string]::IsNullOrEmpty($captureVersion))
+{
     $captureVersion = $fallbackCaptureVersion
     Write-Host "  Using fallback capture version: v$captureVersion" -ForegroundColor Yellow
-} else {
+} else
+{
     Write-Host "  Latest capture version: v$captureVersion" -ForegroundColor Gray
 }
 
 $captureUrl = "https://github.com/bluewave-labs/capture/releases/download/v$captureVersion/capture_${captureVersion}_windows_amd64.zip"
 $captureZip = "$CaptureInstallDir\capture.zip"
 
-try {
+try
+{
     Invoke-WebRequest -Uri $captureUrl -OutFile $captureZip -UseBasicParsing
     Write-Host "  Downloaded capture v$captureVersion" -ForegroundColor Green
-} catch {
+} catch
+{
     Write-Host "ERROR: Failed to download capture: $_" -ForegroundColor Red
     exit 1
 }
 
 # Extract capture to C:\monitor\capture
-try {
+try
+{
     Expand-Archive -Path $captureZip -DestinationPath $CaptureInstallDir -Force
     Remove-Item $captureZip -Force
-    
+
     # Rename capture.exe to avoid conflict with folder name
     $extractedCaptureDir = Join-Path $CaptureInstallDir "capture_${captureVersion}_windows_amd64"
-    if (Test-Path $extractedCaptureDir) {
+    if (Test-Path $extractedCaptureDir)
+    {
         $captureExeSource = Join-Path $extractedCaptureDir "capture.exe"
         $captureExeDest = Join-Path $CaptureInstallDir "capture.exe"
-        if (Test-Path $captureExeSource) {
+        if (Test-Path $captureExeSource)
+        {
             Move-Item $captureExeSource $captureExeDest -Force
         }
         # Copy all files from extracted directory
@@ -183,7 +239,8 @@ try {
         Remove-Item $extractedCaptureDir -Recurse -Force
     }
     Write-Host "  Extracted capture to $CaptureInstallDir" -ForegroundColor Green
-} catch {
+} catch
+{
     Write-Host "ERROR: Failed to extract capture: $_" -ForegroundColor Red
     exit 1
 }
@@ -196,23 +253,26 @@ $servyCli = Join-Path $ServyInstallDir "servy-cli.exe"
 
 $captureExePath = Join-Path $CaptureInstallDir "capture.exe"
 
-if (-not (Test-Path $servyCli)) {
+if (-not (Test-Path $servyCli))
+{
     Write-Host "ERROR: servy-cli.exe not found at $servyCli" -ForegroundColor Red
     exit 1
 }
 
-if (-not (Test-Path $captureExePath)) {
+if (-not (Test-Path $captureExePath))
+{
     Write-Host "ERROR: capture.exe not found at $captureExePath" -ForegroundColor Red
     exit 1
 }
 
 # Stop existing service if it exists
 $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-if ($existingService) {
+if ($existingService)
+{
     Write-Host "  Stopping existing service..." -ForegroundColor Yellow
     Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
-    
+
     # Remove existing service
     Write-Host "  Removing existing service..." -ForegroundColor Yellow
     & $servyCli uninstall --name="$ServiceName" 2>$null
@@ -229,9 +289,11 @@ Write-Host "  Creating service '$ServiceName'..." -ForegroundColor Yellow
     --startupType=Automatic `
     --startupDir="$CaptureInstallDir"
 
-if ($LASTEXITCODE -eq 0) {
+if ($LASTEXITCODE -eq 0)
+{
     Write-Host "  Service created successfully" -ForegroundColor Green
-} else {
+} else
+{
     Write-Host "WARNING: Service creation returned exit code $LASTEXITCODE" -ForegroundColor Yellow
 }
 
@@ -239,9 +301,11 @@ if ($LASTEXITCODE -eq 0) {
 Write-Host "  Starting service..." -ForegroundColor Yellow
 Start-Service -Name $ServiceName -ErrorAction SilentlyContinue
 
-if ($?) {
+if ($?)
+{
     Write-Host "  Service started successfully" -ForegroundColor Green
-} else {
+} else
+{
     Write-Host "WARNING: Service may not have started. Check service status manually." -ForegroundColor Yellow
 }
 
